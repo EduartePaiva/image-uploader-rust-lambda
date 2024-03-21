@@ -67,6 +67,14 @@ async fn function_handler<T: PutFile + GetFile>(
         )
         .write_with_encoder(encoder)?;
 
+    client
+        .put_file(
+            &bkt_names.bucket_to_put_image,
+            &event.payload.image_name,
+            writer,
+        )
+        .await?;
+
     // Prepare the response
     let resp = Response { success: true };
 
