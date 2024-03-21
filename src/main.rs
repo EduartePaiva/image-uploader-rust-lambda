@@ -1,11 +1,11 @@
-use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
 use image::{codecs::jpeg::JpegEncoder, GenericImageView};
 use lambda_runtime::{run, service_fn, tracing, Error, LambdaEvent};
-use s3::{GetFile, PutFile};
+use rust_lambda_image_uploader::ImageMetadata;
 use serde::{Deserialize, Serialize};
 use std::env;
 
-mod s3;
+const MAX_IMAGE_SIZE: u32 = 400;
 
 /// This is a made-up example. Requests come into the runtime as unicode
 /// strings in json format, which can map to any structure that implements `serde::Deserialize`
@@ -34,51 +34,93 @@ struct BucketNames {
 /// There are some code example in the following URLs:
 /// - https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/examples
 /// - https://github.com/aws-samples/serverless-rust-demo/
-async fn function_handler<T: PutFile + GetFile>(
+async fn function_handler(
     event: LambdaEvent<Request>,
-    client: &T,
+    client: &S3Client,
     bkt_names: &BucketNames,
 ) -> Result<Response, Error> {
-    // Extract some useful info from the request
+    let key_name = &event.payload.image_name;
 
-    let (image_to_process, metadata) = client
-        .get_file(&bkt_names.bucket_to_get_image, &event.payload.image_name)
+    //get image from S3
+    let output = client
+        .get_object()
+        .bucket(&bkt_names.bucket_to_get_image)
+        .key(key_name)
+        .send()
         .await?;
-    let mut image_to_process = image::load_from_memory(&image_to_process)?;
+    let metadata = ImageMetadata::new(&output.metadata.ok_or("Should have metadata")?)?;
 
+    //check if image is png or jpeg or webp or jpg
+    let content_type = output.content_type.ok_or("Should have content type")?;
+    match content_type.as_str() {
+        "image/jpg" => (),
+        "image/jpeg" => (),
+        "image/png" => (),
+        "image/webp" => (),
+        _ => return Err("Invalid file type".into()),
+    }
+    // -----------------------
+
+    let mut image_to_process = image::load_from_memory(&output.body.collect().await?.to_vec())?;
     let (width, height) = image_to_process.dimensions();
+    // ------------------------
+
+    // Crop, resize and convert the  image to jpeg with quality of 72dpi
+    let mut resultant_image: Vec<u8> = Vec::new();
+    let encoder = JpegEncoder::new_with_quality(&mut resultant_image, 72);
 
     if metadata.portrait_hight + metadata.y1 > height
         || metadata.portrait_width + metadata.x1 > width
     {
-        //instead of erroing I could just resize it and call a day
-        return Err("Invalid metadata".into());
+        image_to_process.thumbnail(MAX_IMAGE_SIZE, MAX_IMAGE_SIZE)
+    } else {
+        image_to_process
+            .crop(
+                metadata.x1,
+                metadata.y1,
+                metadata.portrait_width,
+                metadata.portrait_hight,
+            )
+            .thumbnail(MAX_IMAGE_SIZE, MAX_IMAGE_SIZE)
     }
+    .write_with_encoder(encoder)?;
+    // ---------------------------
 
-    let mut writer: Vec<u8> = Vec::new();
-    let encoder = JpegEncoder::new_with_quality(&mut writer, 72);
+    // Send image to the other bucket using the "resultant_image"
+    let bucket_to_put_image = &bkt_names.bucket_to_put_image;
+    let bytes = ByteStream::from(resultant_image);
+    let result = client
+        .put_object()
+        .bucket(bucket_to_put_image)
+        .key(key_name)
+        .body(bytes)
+        .content_type("image/jpeg")
+        .send()
+        .await;
 
-    image_to_process
-        .crop(
-            metadata.x1,
-            metadata.y1,
-            metadata.portrait_width,
-            metadata.portrait_hight,
-        )
-        .write_with_encoder(encoder)?;
+    match result {
+        Ok(_) => (),
+        Err(err) => return Err(err.into_service_error().meta().message().unwrap().into()),
+    };
+    // ---------------------------
 
-    client
-        .put_file(
-            &bkt_names.bucket_to_put_image,
-            &event.payload.image_name,
-            writer,
-        )
-        .await?;
+    // delete image from primary bucket
+    let result = client
+        .delete_object()
+        .bucket(&bkt_names.bucket_to_get_image)
+        .key(key_name)
+        .send()
+        .await;
 
-    // Prepare the response
+    match result {
+        Ok(_) => (),
+        Err(err) => {
+            tracing::error!("failed to delete original image {:?}", err);
+        }
+    }
+    //-------------------
+
     let resp = Response { success: true };
-
-    // Return `Response` (it will be serialized to JSON automatically by the runtime)
     Ok(resp)
 }
 

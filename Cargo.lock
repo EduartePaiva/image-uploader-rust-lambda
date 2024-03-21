@@ -103,17 +103,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-trait"
-version = "0.1.78"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "461abc97219de0eaaf81fe3ef974a540158f3d079c2ab200f891f1a2ef201e85"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2000,7 +1989,6 @@ dependencies = [
 name = "rust-lambda-image-uploader"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "aws-config",
  "aws-sdk-s3",
  "image",
