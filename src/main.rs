@@ -65,9 +65,9 @@ async fn function_handler(
     let (width, height) = image_to_process.dimensions();
     // ------------------------
 
-    // Crop, resize and convert the  image to jpeg with quality of 72dpi
+    // Crop, resize and convert the  image to jpeg with quality of 75dpi
     let mut resultant_image: Vec<u8> = Vec::new();
-    let encoder = JpegEncoder::new_with_quality(&mut resultant_image, 72);
+    let encoder = JpegEncoder::new_with_quality(&mut resultant_image, 75);
 
     if metadata.portrait_hight + metadata.y1 > height
         || metadata.portrait_width + metadata.x1 > width

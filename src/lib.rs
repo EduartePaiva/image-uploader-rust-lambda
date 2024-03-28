@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use lambda_runtime::Error;
+use std::collections::HashMap;
 
 pub struct ImageMetadata {
     pub portrait_hight: u32,
