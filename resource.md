@@ -7,3 +7,8 @@ https://www.matsimitsu.com/blog/2019-03-09-resize-images-from-s3-with-aws-lambda
 
 
 [text](https://github.com/awslabs/aws-lambda-rust-runtime/blob/main/examples/basic-s3-thumbnail/src/main.rs)
+
+
+
+
+cargo lambda build --release --arm64 --output-format zip
