@@ -83,7 +83,7 @@ async fn function_handler(
             )
             .thumbnail(MAX_IMAGE_SIZE, MAX_IMAGE_SIZE)
     }
-    .to_rgb8()
+    .into_rgb8()
     .write_with_encoder(encoder)?;
     // ---------------------------
 
