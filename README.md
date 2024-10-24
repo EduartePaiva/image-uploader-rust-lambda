@@ -18,3 +18,6 @@ The arm64 flag make it possible do deploy on arm witch I think it's better.
 
 BUCKET_TO_GET_IMAGE  
 BUCKET_TO_PUT_IMAGE
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
